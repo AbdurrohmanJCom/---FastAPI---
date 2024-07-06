@@ -1,5 +1,0 @@
-alembic
-fastapi[all]
-psycopg2
-python-dotenv
-sqlalchemy
