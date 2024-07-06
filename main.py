@@ -1,33 +1,34 @@
-from fastapi import FastAPI
-from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
+from typing import List, Optional
+from pydantic import BaseModel, Field
 
-app = FastAPI()
-
-# Обработчик исключений
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import ValidationException
+from fastapi.responses import JSONResponse
+
+app = FastAPI(
+    title="Trading App"
+)
 
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
+# Благодаря этой функции клиент видит ошибки, происходящие на сервере, вместо "Internal server error"
+@app.exception_handler(ValidationException)
+async def validation_exception_handler(request: Request, exc: ValidationException):
     return JSONResponse(
-        status_code=422,
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=jsonable_encoder({"detail": exc.errors()}),
     )
 
 
-# Фейковые данные пользователей
 fake_users = [
-    {"id": 1, "role": "admin", "name": "Bob"},
+    {"id": 1, "role": "admin", "name": ["Bob"]},
     {"id": 2, "role": "investor", "name": "John"},
     {"id": 3, "role": "trader", "name": "Matt"},
     {"id": 4, "role": "investor", "name": "Homer", "degree": [
         {"id": 1, "created_at": "2020-01-01T00:00:00", "type_degree": "expert"}
-    ]}
+    ]},
 ]
 
 
@@ -51,23 +52,21 @@ class User(BaseModel):
 
 @app.get("/users/{user_id}", response_model=List[User])
 def get_user(user_id: int):
-    user = [user for user in fake_users if user["id"] == user_id]
-    return user
+    return [user for user in fake_users if user.get("id") == user_id]
 
 
-# Фейковые данные сделок
 fake_trades = [
     {"id": 1, "user_id": 1, "currency": "BTC", "side": "buy", "price": 123, "amount": 2.12},
-    {"id": 2, "user_id": 1, "currency": "BTC", "side": "sell", "price": 125, "amount": 2.12}
+    {"id": 2, "user_id": 1, "currency": "BTC", "side": "sell", "price": 125, "amount": 2.12},
 ]
 
 
 class Trade(BaseModel):
     id: int
     user_id: int
-    currency: str
+    currency: str = Field(max_length=5)
     side: str
-    price: float
+    price: float = Field(ge=0)
     amount: float
 
 
